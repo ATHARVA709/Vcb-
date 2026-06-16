@@ -1,0 +1,11 @@
+{
+  "name": "V-Browser",
+  "description": "A private, low-latency collaborative watchparty workspace featuring real-time screen sharing, high-fidelity video/audio streams, and synchronized web messaging.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
