@@ -183,6 +183,45 @@ app.post('/navigate', async (req, res) => {
 });
 
 /**
+ * 3.1. GET Navigation test controller (Required for easy GET testing from mobile/browsers)
+ * GET /navigate-test?url=https://example.com
+ */
+app.get('/navigate-test', async (req, res) => {
+  try {
+    const url = req.query.url;
+    if (!url) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing 'url' query parameter. Usage: /navigate-test?url=https://example.com"
+      });
+    }
+
+    // Ensure session is active before routing browser commands
+    await initPersistentSession();
+
+    console.log(`[Playwright Session GET] Directing persistent page to: "${url}"`);
+    // Navigate with a generous 20-second timeout limit
+    await page.goto(url, { waitUntil: 'load', timeout: 20000 });
+
+    const currentUrl = page.url();
+    const title = await page.title();
+
+    res.json({
+      success: true,
+      message: "Navigation completed via GET test route",
+      currentUrl,
+      title
+    });
+  } catch (error) {
+    console.error('[Playwright Session GET] Navigation failed:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Navigation command failed'
+    });
+  }
+});
+
+/**
  * 4. Playwright Verification Endpoint (Legacy fallback support)
  * GET /test-browser?url=https://example.com
  */

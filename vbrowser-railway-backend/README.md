@@ -104,6 +104,22 @@ Response:
 
 Now, querying `/session-info` again will return the updated active page metadata, confirming the state remains persistent!
 
+### 3.1. Persistent GET Page Command (Test Route)
+Directly move the live persistent browser instance to a target URL via GET parameter (excellent for mobile web browsers or simple links):
+Request:
+```
+GET https://your-service.up.railway.app/navigate-test?url=https://wikipedia.org
+```
+Response:
+```json
+{
+  "success": true,
+  "message": "Navigation completed via GET test route",
+  "currentUrl": "https://www.wikipedia.org/",
+  "title": "Wikipedia"
+}
+```
+
 ### 4. Live Independent Chromium Playwright Execution (Legacy Verification)
 An alternate endpoint which executes an on-demand, non-persistent browser launch on Railway:
 Request:
