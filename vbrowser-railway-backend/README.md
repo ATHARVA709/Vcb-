@@ -120,6 +120,30 @@ Response:
 }
 ```
 
+### 3.2. Real-Time Active Participant Count
+Get the exact number of active WebSockets/Socket.IO connections synchronized to the shared session:
+Request:
+```
+GET https://your-service.up.railway.app/participants
+```
+Response:
+```json
+{
+  "count": 3
+}
+```
+
+### 3.3. Real-Time GUI Debugging Panel
+Instantly open a visual tracking console in your browser to monitor real-time URL updates, watch state payloads, and pilot navigation live:
+```
+URL: https://your-service.up.railway.app/debug
+```
+*Features:*
+* Polished layout with auto-reconnecting live Socket.IO connection badge.
+* Interactive multi-peer participant counter.
+* Real-time browser state synchronizer showing current page URLs and document titles from the remote container.
+* Dynamic navigation control panel allowing point-and-click URL piloting.
+
 ### 4. Live Independent Chromium Playwright Execution (Legacy Verification)
 An alternate endpoint which executes an on-demand, non-persistent browser launch on Railway:
 Request:

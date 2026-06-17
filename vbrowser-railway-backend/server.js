@@ -6,11 +6,13 @@ import { Server } from 'socket.io';
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+const CORS_ORIGIN = process.env.CORS_ORIGIN || '*';
+
 // Wrap default Express instance into a native Node HTTP Server for Socket.IO support
 const server = createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: '*',
+    origin: CORS_ORIGIN,
     methods: ['GET', 'POST']
   }
 });
