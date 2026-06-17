@@ -7,9 +7,9 @@ This is a minimum viable deployment setup to verify that **Playwright and Chromi
 ```
 /vbrowser-railway-backend
   ├── Dockerfile         <- Builds the microservice on top of Microsoft's official browser environment
-  ├── railway.json       <- Railway configuration declaring DOCKER deployment model
+  ├── railway.json       <- Corrected Railway configuration declaring DOCKERFILE deployment model
   ├── package.json       <- Defines Node dependencies
-  └── server.js          <- Express application running health checks and browser tests
+  └── server.js          <- Express application managing health checks, persistent session state, and navigation commands
 ```
 
 ---
@@ -64,8 +64,48 @@ Response:
 }
 ```
 
-### 2. Live Chromium Playwright Execution
-This logs into Railway, launches Playwright, opens Chromium, loads the webpage, reads the document title elements, and closes automatically:
+### 2. Session Info
+Consult the current status of the persistent browser instance, page headers, or connection state:
+Request:
+```
+GET https://your-service.up.railway.app/session-info
+```
+Response:
+```json
+{
+  "status": "connected",
+  "currentUrl": "about:blank",
+  "title": "",
+  "initializationError": null,
+  "timestamp": "2026-06-17T13:40:00.000Z"
+}
+```
+
+### 3. Persistent Page Command (Navigation)
+Send a POST command to move the live persistent browser instance to a target URL:
+Request:
+```
+POST https://your-service.up.railway.app/navigate
+Content-Type: application/json
+
+{
+  "url": "https://wikipedia.org"
+}
+```
+Response:
+```json
+{
+  "success": true,
+  "message": "Navigation completed",
+  "currentUrl": "https://www.wikipedia.org/",
+  "title": "Wikipedia"
+}
+```
+
+Now, querying `/session-info` again will return the updated active page metadata, confirming the state remains persistent!
+
+### 4. Live Independent Chromium Playwright Execution (Legacy Verification)
+An alternate endpoint which executes an on-demand, non-persistent browser launch on Railway:
 Request:
 ```
 GET https://your-service.up.railway.app/test-browser?url=https://wikipedia.org
