@@ -151,6 +151,18 @@ GET https://your-service.up.railway.app/screenshot
 ```
 *Returns:* Binaries as `image/jpeg` inline. Perfect for real-time mobile display.
 
+### 3.5. Touch-Pilot Mobile Controller Dashboard
+Directly pilot the browser on your Android tablet, smartphone, or computer using a beautiful touch-based virtual remote control deck:
+```
+URL: https://your-service.up.railway.app/controls
+```
+*Key Features:*
+* **Live Viewport Preview**: Renders a crisp live display of the actual remote container window.
+* **Tap-to-Click Mapping**: Tap/click on any element on the screenshot preview! The system automatically maps the relative aspect ratio to native coordinate offsets `(1280 × 720)` and instantly fires a server click action.
+* **Gestures presets**: Physical buttons to scroll vertically ("Scroll Down" / "Scroll Up") and center click ("Click Center") instantly.
+* **Tactical coordinates sandbox**: Dial in exact X/Y keyframe pixels to coordinate precise operations.
+* **Real-time logs panel**: Visual terminal tracking all API success and error messages live on screen.
+
 ---
 
 ## 👆 Phase 6: Interactive Browser Control APIs

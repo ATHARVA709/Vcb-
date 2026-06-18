@@ -707,6 +707,542 @@ app.get('/debug', (req, res) => {
 });
 
 /**
+ * 3.4. Serve Touch-Pilot Controller for Mobile Display (Android/iOS)
+ * GET /controls
+ */
+app.get('/controls', (req, res) => {
+  res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>VBrowser Mobile Controls</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col selection:bg-indigo-500 selection:text-white">
+
+  <!-- Header Section -->
+  <header class="border-b border-slate-800 bg-slate-950/80 backdrop-blur-md sticky top-0 z-50 px-4 py-3 sm:px-6">
+    <div class="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="p-2 bg-indigo-600/10 rounded-xl border border-indigo-500/20 text-indigo-400">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"; />
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold tracking-tight text-white flex items-center gap-2">
+            VBrowser Mobile Touch-Pilot
+            <span class="text-[10px] bg-indigo-500/20 text-indigo-300 font-normal px-2 py-0.5 rounded-full border border-indigo-500/30">Beta</span>
+          </h1>
+          <p class="text-xs text-slate-400">Low-latency gesture remote & visual session tracker</p>
+        </div>
+      </div>
+      
+      <div class="flex items-center gap-2 sm:gap-3 self-start sm:self-center">
+        <!-- Live Connection State badge -->
+        <span id="socket-badge" class="px-2.5 py-1 text-xs font-semibold rounded-full bg-slate-800 text-slate-400 border border-slate-700/60 font-mono">
+          Sync Idle
+        </span>
+        <span id="session-badge" class="px-2.5 py-1 text-xs font-semibold rounded-full bg-slate-800 text-slate-400 border border-slate-700/60 font-mono">
+          Checking browser...
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <!-- URL Address Tracker Banner -->
+  <section class="bg-indigo-950/20 border-b border-slate-800/80 px-4 py-2 sm:px-6">
+    <div class="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center gap-2 text-xs">
+      <div class="flex items-center gap-1.5 shrink-0 text-indigo-400 font-semibold font-mono">
+        <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-ping"></span>
+        REMOTE URL:
+      </div>
+      <div class="truncate text-slate-300 font-mono flex-1 hover:text-white transition cursor-pointer" id="active-url" onclick="window.navigator.clipboard.writeText(this.textContent)">
+        Loading current session address...
+      </div>
+      <div class="text-slate-500 truncate" id="active-title">
+        (No tab loaded)
+      </div>
+    </div>
+  </section>
+
+  <!-- Main Grid Layout -->
+  <main class="max-w-7xl w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1">
+    
+    <!-- LEFT COLUMN: Touch Viewport Frame -->
+    <section class="lg:col-span-7 xl:col-span-8 flex flex-col gap-4">
+      <div class="bg-slate-950 rounded-2xl border border-slate-800 shadow-xl overflow-hidden flex flex-col">
+        <!-- Viewport Header -->
+        <div class="flex items-center justify-between bg-slate-900 px-4 py-3 border-b border-slate-800">
+          <div class="flex items-center gap-2">
+            <span class="flex gap-1.5">
+              <span class="w-3 h-3 rounded-full bg-rose-500/80"></span>
+              <span class="w-3 h-3 rounded-full bg-amber-500/80"></span>
+              <span class="w-3 h-3 rounded-full bg-emerald-500/80"></span>
+            </span>
+            <span class="text-xs font-mono text-slate-400 ml-2">Live Canvas Viewport (1280 × 720)</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <!-- Loading Indicator -->
+            <span id="load-spinner" class="hidden text-indigo-400 animate-spin">
+              <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z";></path>
+              </svg>
+            </span>
+            <span class="text-[11px] font-mono text-slate-500 pb-0.5" id="last-screenshot-time">Updated recently</span>
+          </div>
+        </div>
+
+        <!-- Viewport Workspace Box -->
+        <div class="bg-black relative select-none flex items-center justify-center p-2 min-h-[220px] sm:min-h-[400px]">
+          <div class="relative max-w-full overflow-hidden rounded-lg shadow-2xl border border-slate-900 group">
+            <!-- Screenshot display -->
+            <img 
+              id="viewport-screenshot" 
+              src="/screenshot" 
+              alt="Browser Live Render" 
+              referrerpolicy="no-referrer"
+              class="w-full h-auto object-contain cursor-crosshair block transition opacity-0 duration-300 select-none pointer-events-auto"
+              onload="this.style.opacity=1; document.getElementById('load-spinner').classList.add('hidden');"
+              onerror="onScreenshotLoadError()"
+            />
+            
+            <!-- Tap Indicator Overlay element -->
+            <div id="tap-pointer" class="absolute w-5 h-5 -ml-2.5 -mt-2.5 rounded-full border-2 border-indigo-400 bg-indigo-500/30 scale-0 pointer-events-none transition-all duration-300 z-10 font-normal text-xs text-center leading-4 text-white"></div>
+          </div>
+        </div>
+
+        <!-- Viewport Controls Footer -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900/60 px-4 py-3 border-t border-slate-800 text-xs">
+          <div class="flex flex-wrap items-center gap-4">
+            <label class="flex items-center gap-2 cursor-pointer font-medium text-slate-300">
+              <input type="checkbox" id="toggle-autorefresh" checked class="rounded border-slate-800 bg-slate-950 text-indigo-600 focus:ring-0 focus:ring-offset-0 focus:outline-none w-4 h-4">
+              <span>Auto-refresh (2s)</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer font-medium text-slate-300">
+              <input type="checkbox" id="auto-click-tap" checked class="rounded border-slate-800 bg-slate-950 text-indigo-600 focus:ring-0 focus:ring-offset-0 focus:outline-none w-4 h-4">
+              <span>Auto-click parent-grid on tap</span>
+            </label>
+          </div>
+          <button 
+            id="btn-refresh-manual" 
+            class="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 active:bg-slate-650 text-slate-100 font-semibold rounded-lg font-mono transition"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 8a2.12 2.12 0 010 .582v.418H18" />
+            </svg>
+            Refresh Screenshot
+          </button>
+        </div>
+      </div>
+
+      <!-- Quick Interactive Directions / Tutorial Hint -->
+      <div class="bg-indigo-950/15 border border-indigo-500/20 rounded-xl p-4 flex gap-3 text-xs leading-relaxed text-indigo-200">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0 text-indigo-400 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <div>
+          <span class="font-bold text-white text-indigo-100 uppercase tracking-wide">Touch Viewport Navigation Tip:</span>
+          Hover or click anywhere directly inside the viewport image above. The system automatically maps your relative touch tap dimensions into valid coordinate bounds `(0-1280, 0-720)` and executes a server-side mouse command!
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT COLUMN: Interaction Cockpit Panels -->
+    <section class="lg:col-span-5 xl:col-span-4 flex flex-col gap-6">
+
+      <!-- Redirection / Quick Browser Navigation Card -->
+      <div class="bg-slate-950 rounded-2xl border border-slate-800 shadow-xl p-5 space-y-3">
+        <h2 class="text-sm font-semibold text-white tracking-tight flex items-center gap-2">
+          <span class="w-1.5 h-3 bg-indigo-500 rounded-sm"></span>
+          Pilot Navigation Address
+        </h2>
+        <form id="cockpit-navigate-form" class="flex gap-2">
+          <input 
+            type="url" 
+            id="url-field" 
+            required 
+            placeholder="https://google.com" 
+            class="flex-1 px-3 py-1.5 bg-slate-905 border border-slate-800 rounded-lg text-xs placeholder-slate-500 text-white focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 bg-slate-900"
+          />
+          <button 
+            type="submit" 
+            id="url-submit-btn" 
+            class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-xs font-semibold rounded-lg text-white transition shrink-0"
+          >
+            Go url
+          </button>
+        </form>
+      </div>
+      
+      <!-- Preset Actions / Scrolling Card -->
+      <div class="bg-slate-950 rounded-2xl border border-slate-800 shadow-xl p-5 space-y-4">
+        <h2 class="text-sm font-semibold text-white tracking-tight flex items-center gap-2">
+          <span class="w-1.5 h-3 bg-indigo-500 rounded-sm"></span>
+          Quick Preset Interactions
+        </h2>
+        
+        <div class="grid grid-cols-2 gap-3.5">
+          <button 
+            id="btn-scroll-up" 
+            class="flex items-center justify-center gap-1.5 p-3 bg-slate-900 border border-slate-800 hover:bg-slate-800 hover:border-slate-700 active:bg-slate-750 font-semibold rounded-xl text-xs transition"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" />
+            </svg>
+            Scroll Down
+          </button>
+          
+          <button 
+            id="btn-scroll-down" 
+            class="flex items-center justify-center gap-1.5 p-3 bg-slate-900 border border-slate-800 hover:bg-slate-800 hover:border-slate-700 active:bg-slate-750 font-semibold rounded-xl text-xs transition"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+            Scroll Up
+          </button>
+        </div>
+
+        <button 
+          id="btn-click-center" 
+          class="w-full flex items-center justify-center gap-1.5 p-3 bg-slate-900 border border-slate-800 hover:bg-slate-800 hover:border-slate-700 active:bg-slate-750 font-semibold rounded-xl text-xs text-slate-100 transition"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
+          </svg>
+          Click Center Area (640, 360)
+        </button>
+      </div>
+
+      <!-- Custom Precision Coordinates Input Card -->
+      <div class="bg-slate-950 rounded-2xl border border-slate-800 shadow-xl p-5 space-y-4">
+        <h2 class="text-sm font-semibold text-white tracking-tight flex items-center gap-2">
+          <span class="w-1.5 h-3 bg-indigo-500 rounded-sm"></span>
+          Precision Pointer Sandbox
+        </h2>
+
+        <!-- Coordinates Field Row -->
+        <div class="grid grid-cols-2 gap-4">
+          <div class="space-y-1.5">
+            <label for="input-coord-x" class="text-xs text-slate-400 font-medium">X Coordinate (px)</label>
+            <input 
+              type="number" 
+              id="input-coord-x" 
+              value="640" 
+              min="0" 
+              max="1280"
+              class="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-sm font-mono text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            />
+          </div>
+          <div class="space-y-1.5">
+            <label for="input-coord-y" class="text-xs text-slate-400 font-medium">Y Coordinate (px)</label>
+            <input 
+              type="number" 
+              id="input-coord-y" 
+              value="360" 
+              min="0" 
+              max="720"
+              class="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-sm font-mono text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            />
+          </div>
+        </div>
+
+        <!-- Action triggers -->
+        <div class="grid grid-cols-2 gap-3 pt-2">
+          <button 
+            id="btn-trigger-click" 
+            class="flex items-center justify-center gap-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 font-bold rounded-lg text-xs text-white shadow transition"
+          >
+            Trigger Click
+          </button>
+          <button 
+            id="btn-trigger-move" 
+            class="flex items-center justify-center gap-1 py-2.5 bg-slate-800 border border-slate-700 hover:bg-slate-750 active:bg-slate-700 rounded-lg text-xs font-semibold text-slate-100 transition"
+          >
+            Move Cursor
+          </button>
+        </div>
+      </div>
+
+      <!-- Live API Response Activity Logs -->
+      <div class="bg-slate-950 rounded-2xl border border-slate-800 shadow-xl overflow-hidden flex flex-col h-56">
+        <div class="bg-slate-900 px-4 py-2 flex items-center justify-between border-b border-slate-800">
+          <span class="text-xs font-semibold tracking-wider uppercase text-slate-400">Interaction Log Console</span>
+          <button id="btn-clear-console" class="text-[10px] text-indigo-400 hover:text-indigo-300 font-mono">Clear</button>
+        </div>
+        <div id="log-container" class="p-3 font-mono text-[11px] space-y-1.5 flex-1 overflow-y-auto bg-slate-950 scrollbar-thin">
+          <div class="text-slate-500">[System] Console Initialized. Ready for actions.</div>
+        </div>
+      </div>
+
+    </section>
+  </main>
+
+  <!-- Script block handling interaction logics -->
+  <script>
+    const socket = io();
+    const activeUrl = document.getElementById('active-url');
+    const activeTitle = document.getElementById('active-title');
+    const socketBadge = document.getElementById('socket-badge');
+    const sessionBadge = document.getElementById('session-badge');
+
+    const screenshotImg = document.getElementById('viewport-screenshot');
+    const touchPointer = document.getElementById('tap-pointer');
+    const loadSpinner = document.getElementById('load-spinner');
+    const lastScreenshotTime = document.getElementById('last-screenshot-time');
+
+    const autoRefreshCheckbox = document.getElementById('toggle-autorefresh');
+    const manualRefreshBtn = document.getElementById('btn-refresh-manual');
+
+    // Controls Inputs and Buttons
+    const inputX = document.getElementById('input-coord-x');
+    const inputY = document.getElementById('input-coord-y');
+
+    const btnScrollUp = document.getElementById('btn-scroll-up');
+    const btnScrollDown = document.getElementById('btn-scroll-down');
+    const btnClickCenter = document.getElementById('btn-click-center');
+
+    const btnTriggerClick = document.getElementById('btn-trigger-click');
+    const btnTriggerMove = document.getElementById('btn-trigger-move');
+    const btnClearConsole = document.getElementById('btn-clear-console');
+    const logContainer = document.getElementById('log-container');
+
+    const cockpitForm = document.getElementById('cockpit-navigate-form');
+    const urlField = document.getElementById('url-field');
+
+    // Interval handler reference
+    let screenshotInterval = null;
+
+    // Helper to log console logs to the custom UI panel
+    function logMessage(text, status = 'info') {
+      const entry = document.createElement('div');
+      const timeStr = new Date().toLocaleTimeString();
+      let colorClass = 'text-slate-300';
+      if (status === 'success') colorClass = 'text-green-400';
+      if (status === 'error') colorClass = 'text-rose-400';
+      if (status === 'info') colorClass = 'text-indigo-300';
+      
+      entry.className = "leading-5 break-all " + colorClass;
+      entry.innerHTML = '<span class="text-slate-600">[' + timeStr + ']</span> ' + text;
+      
+      logContainer.appendChild(entry);
+      logContainer.scrollTop = logContainer.scrollHeight;
+    }
+
+    // Refresh screenshot view
+    function refreshScreenshot() {
+      loadSpinner.classList.remove('hidden');
+      const cacheBust = "?_t=" + Date.now();
+      screenshotImg.src = "/screenshot" + cacheBust;
+      lastScreenshotTime.textContent = "Synced: " + new Date().toLocaleTimeString();
+    }
+
+    // Error recovery for screenshot loading
+    function onScreenshotLoadError() {
+      loadSpinner.classList.add('hidden');
+      lastScreenshotTime.textContent = "Screenshot fetch failed";
+      logMessage("Failed to fetch browser viewport screenshot. Check if target browser crashed or is sleeping.", "error");
+    }
+
+    // Trigger API action wrapper
+    async function callActionAPI(url, data = {}) {
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(data)
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+          logMessage(result.message || "Executed command successfully.", "success");
+          // Instant screen refresh for visual feedback!
+          setTimeout(refreshScreenshot, 400);
+        } else {
+          logMessage("Error: " + (result.error || "Unknown response"), "error");
+        }
+      } catch (err) {
+        logMessage("HTTP Network Error: " + err.message, "error");
+      }
+    }
+
+    // Auto-refresh timer coordinator
+    function configureAutoRefresh() {
+      if (autoRefreshCheckbox.checked) {
+        if (!screenshotInterval) {
+          logMessage("Enabled live viewport auto-refresh cycle (2000ms).", "info");
+          screenshotInterval = setInterval(refreshScreenshot, 2000);
+        }
+      } else {
+        if (screenshotInterval) {
+          logMessage("Suspended session auto-refresh cycle.", "info");
+          clearInterval(screenshotInterval);
+          screenshotInterval = null;
+        }
+      }
+    }
+
+    // Capture touch tap coords on screenshot image
+    screenshotImg.addEventListener('click', (e) => {
+      const rect = screenshotImg.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const clickY = e.clientY - rect.top;
+      
+      // Scale coordinates back to Playwright viewport (1280x720)
+      const scaleX = 1280 / rect.width;
+      const scaleY = 720 / rect.height;
+      
+      const realX = Math.round(clickX * scaleX);
+      const realY = Math.round(clickY * scaleY);
+      
+      // Update inputs
+      inputX.value = realX;
+      inputY.value = realY;
+
+      // Position the nice indicator pointer dynamically
+      const percentLeft = (clickX / rect.width) * 100;
+      const percentTop = (clickY / rect.height) * 100;
+      touchPointer.style.left = percentLeft + '%';
+      touchPointer.style.top = percentTop + '%';
+      
+      touchPointer.classList.remove('scale-0');
+      touchPointer.classList.add('scale-100');
+      setTimeout(() => {
+        touchPointer.classList.remove('scale-100');
+        touchPointer.classList.add('scale-0');
+      }, 1200);
+
+      logMessage(\`Viewport tap translated: (\${realX}, \${realY})\`, "info");
+      
+      if (document.getElementById('auto-click-tap').checked) {
+        callActionAPI('/click', { x: realX, y: realY });
+      }
+    });
+
+    // Handle WebSocket session sync updates
+    socket.on('connect', () => {
+      socketBadge.className = "px-2.5 py-1 text-xs font-semibold rounded-full bg-emerald-950/40 text-emerald-400 border border-emerald-500/30 font-mono";
+      socketBadge.textContent = "Live Link Sync Active";
+      logMessage("Established browser websocket state gateway tunnel.", "success");
+    });
+
+    socket.on('disconnect', () => {
+      socketBadge.className = "px-2.5 py-1 text-xs font-semibold rounded-full bg-red-950/40 text-rose-400 border border-rose-500/30 font-mono";
+      socketBadge.textContent = "Sync offline";
+      logMessage("Lost websocket gateway tunnel connection.", "error");
+    });
+
+    socket.on('browser:state', (data) => {
+      activeUrl.textContent = data.currentUrl || 'about:blank';
+      activeTitle.textContent = data.title || '(No active documents)';
+      
+      // Update browser-status in badge
+      sessionBadge.textContent = "Viewport: Ready";
+      sessionBadge.className = "px-2.5 py-1 text-xs font-semibold rounded-full bg-indigo-950/40 text-indigo-300 border border-indigo-500/30 font-mono";
+      
+      // Auto refresh immediately on route navigations
+      refreshScreenshot();
+    });
+
+    // Basic session initialization health checks
+    async function checkPlaywrightSession() {
+      try {
+        const res = await fetch('/session-info');
+        const data = await res.json();
+        if (data.status === 'connected') {
+          sessionBadge.textContent = "Browser Engine: Online";
+          sessionBadge.className = "px-2.5 py-1 text-xs font-semibold rounded-full bg-green-950/40 text-green-400 border border-green-500/30 font-mono";
+        } else {
+          sessionBadge.textContent = "Browser Engine: " + data.status;
+          sessionBadge.className = "px-2.5 py-1 text-xs font-semibold rounded-full bg-amber-950/40 text-amber-400 border border-amber-500/20 font-mono";
+        }
+      } catch (err) {
+        sessionBadge.textContent = "Browser Engine: Unreachable";
+        sessionBadge.className = "px-2.5 py-1 text-xs font-semibold rounded-full bg-rose-950/40 text-rose-400 border border-rose-500/20 font-mono";
+      }
+    }
+
+    // Actions Listeners Wiring
+    btnScrollUp.addEventListener('click', () => callActionAPI('/scroll', { deltaY: -300 }));
+    btnScrollDown.addEventListener('click', () => callActionAPI('/scroll', { deltaY: 300 }));
+    btnClickCenter.addEventListener('click', () => callActionAPI('/click', { x: 640, y: 360 }));
+
+    btnTriggerClick.addEventListener('click', () => {
+      const x = parseInt(inputX.value, 10);
+      const y = parseInt(inputY.value, 10);
+      callActionAPI('/click', { x, y });
+    });
+
+    btnTriggerMove.addEventListener('click', () => {
+      const x = parseInt(inputX.value, 10);
+      const y = parseInt(inputY.value, 10);
+      callActionAPI('/move', { x, y });
+    });
+
+    manualRefreshBtn.addEventListener('click', () => {
+      refreshScreenshot();
+      logMessage("Triggered manual screenshot refresh.", "info");
+    });
+    autoRefreshCheckbox.addEventListener('change', configureAutoRefresh);
+
+    btnClearConsole.addEventListener('click', () => {
+      logContainer.innerHTML = '<div class="text-slate-500">[System] Log cleared. Ready.</div>';
+    });
+
+    cockpitForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const targetUrl = urlField.value.trim();
+      if (!targetUrl) return;
+
+      const submitBtn = document.getElementById('url-submit-btn');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Hold...';
+      logMessage("Instruction sent: Navigating persistent tab to: " + targetUrl, "info");
+
+      try {
+        const response = await fetch("/navigate-test?url=" + encodeURIComponent(targetUrl));
+        const result = await response.json();
+        
+        if (result.success) {
+          logMessage("Navigation completed successfully.", "success");
+          urlField.value = '';
+          setTimeout(refreshScreenshot, 600);
+        } else {
+          logMessage("Fail: " + result.error, "error");
+        }
+      } catch (err) {
+        logMessage("Error navigating: " + err.message, "error");
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Go url';
+      }
+    });
+
+    // Boot Sequences
+    checkPlaywrightSession();
+    configureAutoRefresh();
+    refreshScreenshot();
+  </script>
+</body>
+</html>`);
+});
+
+/**
  * 4. Playwright Verification Endpoint (Legacy fallback support)
  * GET /test-browser?url=https://example.com
  */
@@ -767,6 +1303,7 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`🔗 Navigation: POST http://localhost:${PORT}/navigate`);
   console.log(`🔗 Participants: http://localhost:${PORT}/participants`);
   console.log(`🔗 Debugger Panel: http://localhost:${PORT}/debug`);
+  console.log(`🔗 Mobile Controller Dashboard: http://localhost:${PORT}/controls`);
   console.log(`🔗 Screenshot: http://localhost:${PORT}/screenshot`);
   console.log(`🔗 Mouse Click: POST http://localhost:${PORT}/click`);
   console.log(`🔗 Mouse Move: POST http://localhost:${PORT}/move`);
