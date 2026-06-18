@@ -358,6 +358,158 @@ app.get('/screenshot', async (req, res) => {
 });
 
 /**
+ * 3.2.2. Interactive mouse click endpoint
+ * POST /click
+ * Body: { x, y }
+ */
+app.post('/click', async (req, res) => {
+  try {
+    const { x, y } = req.body;
+    if (x === undefined || y === undefined) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing 'x' or 'y' parameters in the request body."
+      });
+    }
+
+    // Ensure session is active before routing browser commands
+    await initPersistentSession();
+
+    if (!page || browserStatus !== 'connected') {
+      return res.status(500).json({
+        success: false,
+        error: "Persistent browser session is currently unavailable."
+      });
+    }
+
+    const posX = Number(x);
+    const posY = Number(y);
+    if (isNaN(posX) || isNaN(posY)) {
+      return res.status(400).json({
+        success: false,
+        error: "Parameters 'x' and 'y' must be valid numbers."
+      });
+    }
+
+    console.log(`[Playwright Session] Mouse clicking at (${posX}, ${posY})...`);
+    await page.mouse.click(posX, posY);
+
+    // Broadcast the new state to all listeners right away
+    await broadcastBrowserState();
+
+    res.json({
+      success: true,
+      message: `Mouse clicked successfully at (${posX}, ${posY})`
+    });
+  } catch (error) {
+    console.error('[Playwright Session] Click command failed:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Click command failed'
+    });
+  }
+});
+
+/**
+ * 3.2.3. Interactive mouse move endpoint
+ * POST /move
+ * Body: { x, y }
+ */
+app.post('/move', async (req, res) => {
+  try {
+    const { x, y } = req.body;
+    if (x === undefined || y === undefined) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing 'x' or 'y' parameters in the request body."
+      });
+    }
+
+    // Ensure session is active before routing browser commands
+    await initPersistentSession();
+
+    if (!page || browserStatus !== 'connected') {
+      return res.status(500).json({
+        success: false,
+        error: "Persistent browser session is currently unavailable."
+      });
+    }
+
+    const posX = Number(x);
+    const posY = Number(y);
+    if (isNaN(posX) || isNaN(posY)) {
+      return res.status(400).json({
+        success: false,
+        error: "Parameters 'x' and 'y' must be valid numbers."
+      });
+    }
+
+    console.log(`[Playwright Session] Mouse moving to (${posX}, ${posY})...`);
+    await page.mouse.move(posX, posY);
+
+    res.json({
+      success: true,
+      message: `Mouse moved successfully to (${posX}, ${posY})`
+    });
+  } catch (error) {
+    console.error('[Playwright Session] Move command failed:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Move command failed'
+    });
+  }
+});
+
+/**
+ * 3.2.4. Interactive mouse virtual scroll endpoint
+ * POST /scroll
+ * Body: { deltaY }
+ */
+app.post('/scroll', async (req, res) => {
+  try {
+    const { deltaY } = req.body;
+    if (deltaY === undefined) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing 'deltaY' parameter in the request body."
+      });
+    }
+
+    // Ensure session is active before routing browser commands
+    await initPersistentSession();
+
+    if (!page || browserStatus !== 'connected') {
+      return res.status(500).json({
+        success: false,
+        error: "Persistent browser session is currently unavailable."
+      });
+    }
+
+    const dY = Number(deltaY);
+    if (isNaN(dY)) {
+      return res.status(400).json({
+        success: false,
+        error: "Parameter 'deltaY' must be a valid number."
+      });
+    }
+
+    console.log(`[Playwright Session] Scrolling wheel vertically by ${dY}px...`);
+    await page.mouse.wheel(0, dY);
+
+    res.json({
+      success: true,
+      message: `Scrolling completed successfully by ${dY}px`
+    });
+  } catch (error) {
+    console.error('[Playwright Session] Scroll command failed:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Scroll command failed'
+    });
+  }
+});
+
+/**
  * 3.3. Test Debug dashboard showing live status and synchronized properties (Required)
  * GET /debug
  */
@@ -616,6 +768,9 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`🔗 Participants: http://localhost:${PORT}/participants`);
   console.log(`🔗 Debugger Panel: http://localhost:${PORT}/debug`);
   console.log(`🔗 Screenshot: http://localhost:${PORT}/screenshot`);
+  console.log(`🔗 Mouse Click: POST http://localhost:${PORT}/click`);
+  console.log(`🔗 Mouse Move: POST http://localhost:${PORT}/move`);
+  console.log(`🔗 Mouse Scroll: POST http://localhost:${PORT}/scroll`);
   console.log(`======================================================\n`);
 });
 

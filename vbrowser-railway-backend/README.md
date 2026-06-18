@@ -144,6 +144,101 @@ URL: https://your-service.up.railway.app/debug
 * Real-time browser state synchronizer showing current page URLs and document titles from the remote container.
 * Dynamic navigation control panel allowing point-and-click URL piloting.
 
+### 3.4. Screenshot Capture
+Grab a live screenshot in JPEG format directly from the active, persistent browser tab without spinning up any new engines:
+```
+GET https://your-service.up.railway.app/screenshot
+```
+*Returns:* Binaries as `image/jpeg` inline. Perfect for real-time mobile display.
+
+---
+
+## 👆 Phase 6: Interactive Browser Control APIs
+Automate navigation, interaction, and gestures by firing REST payloads straight to the shared page layer:
+
+### 1. Simulate Mouse Clicks
+Triggers a precise mouse down/up action at the specified `(x, y)` coordinate grid location.
+* **Route:** `POST /click`
+* **Headers:** `Content-Type: application/json`
+* **Body:**
+  ```json
+  {
+    "x": 250,
+    "y": 450
+  }
+  ```
+* **Response:**
+  ```json
+  {
+    "success": true,
+    "message": "Mouse clicked successfully at (250, 450)"
+  }
+  ```
+
+### 2. Simulate Cursor Movements
+Smoothly moves the virtual container cursor to the target coordinate offset.
+* **Route:** `POST /move`
+* **Headers:** `Content-Type: application/json`
+* **Body:**
+  ```json
+  {
+    "x": 600,
+    "y": 300
+  }
+  ```
+* **Response:**
+  ```json
+  {
+    "success": true,
+    "message": "Mouse moved successfully to (600, 300)"
+  }
+  ```
+
+### 3. Scroll Content Vertically
+Performs an instantaneous, frictionless structural scroll vertically using virtual mouse hardware wheel.
+* **Route:** `POST /scroll`
+* **Headers:** `Content-Type: application/json`
+* **Body:**
+  ```json
+  {
+    "deltaY": 300
+  }
+  ```
+* **Response:**
+  ```json
+  {
+    "success": true,
+    "message": "Scrolling completed successfully by 300px"
+  }
+  ```
+
+---
+
+## 📱 Mobile-Friendly Command Line Testing Workflow
+Since these are Standard REST endpoints, you can execute precise tests right from any mobile terminal emulator, including **Termux on Android** or **iSH on iOS**:
+
+### 1. Clicking on a Page Coordinate (e.g. Navigation Links)
+```bash
+curl -X POST https://your-service.up.railway.app/click \
+  -H "Content-Type: application/json" \
+  -d '{"x": 100, "y": 150}'
+```
+
+### 2. Scrolling down 400 pixels to read articles
+```bash
+curl -X POST https://your-service.up.railway.app/scroll \
+  -H "Content-Type: application/json" \
+  -d '{"deltaY": 400}'
+```
+
+### 3. Verify page result visually in browser
+Immediately download the result inline onto your mobile browser to visually see the hover/click results:
+```
+https://your-service.up.railway.app/screenshot
+```
+
+---
+
 ### 4. Live Independent Chromium Playwright Execution (Legacy Verification)
 An alternate endpoint which executes an on-demand, non-persistent browser launch on Railway:
 Request:
