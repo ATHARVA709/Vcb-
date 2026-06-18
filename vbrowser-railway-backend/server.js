@@ -324,6 +324,40 @@ app.get('/participants', (req, res) => {
 });
 
 /**
+ * 3.2.1. Screenshot Endpoint (Required)
+ * GET /screenshot
+ * Captures a JPEG screenshot of the current page, reusing the persistent page.
+ */
+app.get('/screenshot', async (req, res) => {
+  try {
+    // Ensure persistent session is active and healthy
+    await initPersistentSession();
+
+    if (!page || browserStatus !== 'connected') {
+      return res.status(500).json({
+        success: false,
+        error: "Persistent browser session is currently unavailable."
+      });
+    }
+
+    console.log('[Playwright Session] Capturing JPEG screenshot of the current page...');
+    const buffer = await page.screenshot({
+      type: 'jpeg',
+      quality: 80
+    });
+
+    res.setHeader('Content-Type', 'image/jpeg');
+    res.send(buffer);
+  } catch (error) {
+    console.error('[Playwright Session] Failed to capture screenshot:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Screenshot command failed'
+    });
+  }
+});
+
+/**
  * 3.3. Test Debug dashboard showing live status and synchronized properties (Required)
  * GET /debug
  */
@@ -581,6 +615,7 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`🔗 Navigation: POST http://localhost:${PORT}/navigate`);
   console.log(`🔗 Participants: http://localhost:${PORT}/participants`);
   console.log(`🔗 Debugger Panel: http://localhost:${PORT}/debug`);
+  console.log(`🔗 Screenshot: http://localhost:${PORT}/screenshot`);
   console.log(`======================================================\n`);
 });
 
