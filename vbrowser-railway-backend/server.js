@@ -510,6 +510,94 @@ app.post('/scroll', async (req, res) => {
 });
 
 /**
+ * 3.2.7. Interactive keyboard type endpoint
+ * POST /type
+ * Body: { text }
+ */
+app.post('/type', async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (text === undefined) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing 'text' parameter in the request body."
+      });
+    }
+
+    // Ensure session is active before routing browser commands
+    await initPersistentSession();
+
+    if (!page || browserStatus !== 'connected') {
+      return res.status(500).json({
+        success: false,
+        error: "Persistent browser session is currently unavailable."
+      });
+    }
+
+    console.log(`[Playwright Session] Keyboard typing text: "${text}"...`);
+    await page.keyboard.type(text);
+
+    // Broadcast the new state to all listeners right away
+    await broadcastBrowserState();
+
+    res.json({
+      success: true,
+      message: `Typed text successfully`
+    });
+  } catch (error) {
+    console.error('[Playwright Session] Type command failed:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Type command failed'
+    });
+  }
+});
+
+/**
+ * 3.2.8. Interactive keyboard keypress endpoint
+ * POST /press
+ * Body: { key }
+ */
+app.post('/press', async (req, res) => {
+  try {
+    const { key } = req.body;
+    if (!key) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing 'key' parameter in the request body."
+      });
+    }
+
+    // Ensure session is active before routing browser commands
+    await initPersistentSession();
+
+    if (!page || browserStatus !== 'connected') {
+      return res.status(500).json({
+        success: false,
+        error: "Persistent browser session is currently unavailable."
+      });
+    }
+
+    console.log(`[Playwright Session] Keyboard pressing key: "${key}"...`);
+    await page.keyboard.press(key);
+
+    // Broadcast the new state to all listeners right away
+    await broadcastBrowserState();
+
+    res.json({
+      success: true,
+      message: `Pressed key "${key}" successfully`
+    });
+  } catch (error) {
+    console.error('[Playwright Session] Press command failed:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Press command failed'
+    });
+  }
+});
+
+/**
  * 3.3. Test Debug dashboard showing live status and synchronized properties (Required)
  * GET /debug
  */
@@ -603,6 +691,44 @@ app.get('/debug', (req, res) => {
         <p id="navigate-status" class="text-xs font-semibold hidden"></p>
       </div>
 
+      <div class="space-y-3 bg-slate-50/30 rounded-xl p-5 border border-slate-100">
+        <h3 class="text-sm font-medium text-slate-900">Keyboard Session Remote</h3>
+        <p class="text-xs text-slate-500">Inject raw keyboard events into the active webpage. Make sure a target input element is focused first (e.g. by tapping on it inside the /controls view).</p>
+        
+        <div class="space-y-3 mt-2">
+          <div class="flex gap-2.5">
+            <input 
+              type="text" 
+              id="keyboard-text-input" 
+              placeholder="Type message or text here..." 
+              class="flex-1 px-3.5 py-2 text-sm rounded-lg border border-slate-200 bg-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-slate-900"
+            />
+            <button 
+              id="btn-keyboard-type"
+              class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-sm font-semibold rounded-lg text-white transition duration-150 shadow-sm focus:outline-none"
+            >
+              Type Text
+            </button>
+          </div>
+          
+          <div class="flex gap-2.5">
+            <button 
+              id="btn-keyboard-enter"
+              class="flex-1 px-4 py-2 bg-slate-850 hover:bg-slate-900 text-sm font-semibold rounded-lg text-slate-800 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition duration-150 shadow-sm focus:outline-none"
+            >
+              Press Enter ↩
+            </button>
+            <button 
+              id="btn-keyboard-backspace"
+              class="flex-1 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-sm font-semibold rounded-lg text-white transition duration-150 shadow-sm focus:outline-none"
+            >
+              Press Backspace ⌫
+            </button>
+          </div>
+        </div>
+        <p id="keyboard-status" class="text-xs font-semibold hidden mt-2"></p>
+      </div>
+
     </div>
   </div>
 
@@ -620,6 +746,13 @@ app.get('/debug', (req, res) => {
     const urlInput = document.getElementById('url-input');
     const submitBtn = document.getElementById('submit-btn');
     const navigateStatus = document.getElementById('navigate-status');
+
+    // Keyboard Elements
+    const keyboardTextInput = document.getElementById('keyboard-text-input');
+    const btnKeyboardType = document.getElementById('btn-keyboard-type');
+    const btnKeyboardEnter = document.getElementById('btn-keyboard-enter');
+    const btnKeyboardBackspace = document.getElementById('btn-keyboard-backspace');
+    const keyboardStatus = document.getElementById('keyboard-status');
 
     function updateStatusIndicator(status) {
       browserStatusText.textContent = status;
@@ -699,6 +832,85 @@ app.get('/debug', (req, res) => {
         setTimeout(() => {
           navigateStatus.classList.add('hidden');
         }, 5000);
+      }
+    });
+
+    function showKeyboardStatus(message, isSuccess) {
+      if (isSuccess === undefined) isSuccess = true;
+      keyboardStatus.className = "text-xs font-semibold " + (isSuccess ? "text-green-600" : "text-rose-600") + " block mt-2";
+      keyboardStatus.textContent = message;
+      keyboardStatus.classList.remove("hidden");
+      setTimeout(function() {
+        keyboardStatus.classList.add("hidden");
+      }, 4000);
+    }
+
+    btnKeyboardType.addEventListener('click', async () => {
+      const text = keyboardTextInput.value;
+      if (!text) {
+        showKeyboardStatus('Please type some text first', false);
+        return;
+      }
+      btnKeyboardType.disabled = true;
+      try {
+        const response = await fetch('/type', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: text })
+        });
+        const result = await response.json();
+        if (result.success) {
+          showKeyboardStatus('Successfully typed text: "' + text + '"', true);
+          keyboardTextInput.value = '';
+        } else {
+          showKeyboardStatus('Error: ' + result.error, false);
+        }
+      } catch (err) {
+        showKeyboardStatus('Network error: ' + err.message, false);
+      } finally {
+        btnKeyboardType.disabled = false;
+      }
+    });
+
+    btnKeyboardEnter.addEventListener('click', async () => {
+      btnKeyboardEnter.disabled = true;
+      try {
+        const response = await fetch('/press', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key: 'Enter' })
+        });
+        const result = await response.json();
+        if (result.success) {
+          showKeyboardStatus('Pressed "Enter" key successfully!', true);
+        } else {
+          showKeyboardStatus('Error: ' + result.error, false);
+        }
+      } catch (err) {
+        showKeyboardStatus('Network error: ' + err.message, false);
+      } finally {
+        btnKeyboardEnter.disabled = false;
+      }
+    });
+
+    btnKeyboardBackspace.addEventListener('click', async () => {
+      btnKeyboardBackspace.disabled = true;
+      try {
+        const response = await fetch('/press', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key: 'Backspace' })
+        });
+        const result = await response.json();
+        if (result.success) {
+          showKeyboardStatus('Pressed "Backspace" key successfully!', true);
+        } else {
+          showKeyboardStatus('Error: ' + result.error, false);
+        }
+      } catch (err) {
+        showKeyboardStatus('Network error: ' + err.message, false);
+      } finally {
+        btnKeyboardBackspace.disabled = false;
       }
     });
   </script>
@@ -1308,6 +1520,8 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`🔗 Mouse Click: POST http://localhost:${PORT}/click`);
   console.log(`🔗 Mouse Move: POST http://localhost:${PORT}/move`);
   console.log(`🔗 Mouse Scroll: POST http://localhost:${PORT}/scroll`);
+  console.log(`🔗 Keyboard Type: POST http://localhost:${PORT}/type`);
+  console.log(`🔗 Keyboard Press: POST http://localhost:${PORT}/press`);
   console.log(`======================================================\n`);
 });
 

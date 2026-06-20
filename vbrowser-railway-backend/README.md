@@ -226,6 +226,47 @@ Performs an instantaneous, frictionless structural scroll vertically using virtu
 
 ---
 
+## ⌨️ Phase 7: Interactive Keyboard Control APIs
+Inject raw, precise keyboard signals into the active persistent document layer using Web REST requests:
+
+### 1. Type Text Blocks
+Sends keystokes for a complete block of text into whichever input element is currently focused on the page.
+* **Route:** `POST /type`
+* **Headers:** `Content-Type: application/json`
+* **Body:**
+  ```json
+  {
+    "text": "hello world"
+  }
+  ```
+* **Response:**
+  ```json
+  {
+    "success": true,
+    "message": "Typed text successfully"
+  }
+  ```
+
+### 2. Press Individual Control Keys
+Simulates pressing a specific individual physical button (such as `'Enter'`, `'Backspace'`, `'Tab'`, `'Escape'`, etc.).
+* **Route:** `POST /press`
+* **Headers:** `Content-Type: application/json`
+* **Body:**
+  ```json
+  {
+    "key": "Enter"
+  }
+  ```
+* **Response:**
+  ```json
+  {
+    "success": true,
+    "message": "Pressed key \"Enter\" successfully"
+  }
+  ```
+
+---
+
 ## 📱 Mobile-Friendly Command Line Testing Workflow
 Since these are Standard REST endpoints, you can execute precise tests right from any mobile terminal emulator, including **Termux on Android** or **iSH on iOS**:
 
